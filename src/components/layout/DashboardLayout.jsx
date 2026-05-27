@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 
@@ -10,13 +10,21 @@ export default function DashboardLayout({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  useEffect(() => {
+    document.body.classList.toggle("nav-open", sidebarOpen);
+
+    return () => {
+      document.body.classList.remove("nav-open");
+    };
+  }, [sidebarOpen]);
+
   function handleRouteChange(routeKey) {
     setActiveRoute(routeKey);
     setSidebarOpen(false);
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${sidebarOpen ? " sidebar-active" : ""}`}>
       <Sidebar
         routes={routes}
         activeRoute={activeRoute}
