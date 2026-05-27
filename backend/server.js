@@ -593,6 +593,31 @@ app.get("/health", (req, res) => {
   res.json({ ok: true, service: "Reality Engine X API (MySQL-Enhanced)" });
 });
 
+app.get("/db-health", async (req, res) => {
+  try {
+    const [[databaseInfo]] = await pool.execute("SELECT DATABASE() AS databaseName");
+    const [usersTables] = await pool.execute("SHOW TABLES LIKE 'users'");
+    const [foodTables] = await pool.execute("SHOW TABLES LIKE 'food_catalog'");
+    const [[userCount]] = usersTables.length
+      ? await pool.execute("SELECT COUNT(*) AS count FROM users")
+      : [[{ count: null }]];
+
+    res.json({
+      ok: true,
+      database: databaseInfo.databaseName,
+      tables: {
+        users: usersTables.length > 0,
+        food_catalog: foodTables.length > 0
+      },
+      counts: {
+        users: userCount.count
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ ok: false, message: error.message });
+  }
+});
+
 app.get("/food-catalog", async (req, res) => {
   try {
     const [foods] = await pool.execute(
