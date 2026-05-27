@@ -223,11 +223,11 @@ async function getFullUser(userId) {
   const [feedback] = await pool.execute("SELECT * FROM feedback WHERE user_id = ? ORDER BY created_at DESC LIMIT 20", [userId]);
 
   // New tables data
-  const [dietPlans] = await pool.execute("SELECT *, DATE_FORMAT(startDate, '%Y-%m-%d') as startDate, DATE_FORMAT(endDate, '%Y-%m-%d') as endDate FROM DietPlan WHERE userID = ? ORDER BY startDate DESC", [userId]);
-  const [foodLogs] = await pool.execute("SELECT *, DATE_FORMAT(date, '%Y-%m-%d') as date FROM FoodLog WHERE userID = ? ORDER BY date DESC", [userId]);
-  const [moodLogs] = await pool.execute("SELECT *, DATE_FORMAT(date, '%Y-%m-%d') as date FROM MoodLog WHERE userID = ? ORDER BY date DESC", [userId]);
-  const [progress] = await pool.execute("SELECT progressID, userID, DATE_FORMAT(date, '%Y-%m-%d') as date, weight, bodyMeasurement, progressNote, consistencyScore FROM ProgressTracking WHERE userID = ? ORDER BY date DESC", [userId]);
-  const [predictions] = await pool.execute("SELECT *, DATE_FORMAT(date, '%Y-%m-%d') as date FROM PredictionResult WHERE userID = ? ORDER BY date DESC", [userId]);
+  const [dietPlans] = await pool.execute("SELECT *, DATE_FORMAT(startDate, '%Y-%m-%d') as startDate, DATE_FORMAT(endDate, '%Y-%m-%d') as endDate FROM dietplan WHERE userID = ? ORDER BY startDate DESC", [userId]);
+  const [foodLogs] = await pool.execute("SELECT *, DATE_FORMAT(date, '%Y-%m-%d') as date FROM foodlog WHERE userID = ? ORDER BY date DESC", [userId]);
+  const [moodLogs] = await pool.execute("SELECT *, DATE_FORMAT(date, '%Y-%m-%d') as date FROM moodlog WHERE userID = ? ORDER BY date DESC", [userId]);
+  const [progress] = await pool.execute("SELECT progressID, userID, DATE_FORMAT(date, '%Y-%m-%d') as date, weight, bodyMeasurement, progressNote, consistencyScore FROM progresstracking WHERE userID = ? ORDER BY date DESC", [userId]);
+  const [predictions] = await pool.execute("SELECT *, DATE_FORMAT(date, '%Y-%m-%d') as date FROM predictionresult WHERE userID = ? ORDER BY date DESC", [userId]);
   const [recs] = await pool.execute("SELECT *, DATE_FORMAT(date, '%Y-%m-%d') as date FROM Recommendations WHERE userID = ? ORDER BY date DESC", [userId]);
   const [failureRisks] = await pool.execute("SELECT id, user_id, DATE_FORMAT(check_in_date, '%Y-%m-%d') as checkInDate, risk_score as riskScore, risk_level as riskLevel, risk_message as riskMessage, reasons, insights, metrics, created_at as createdAt FROM failure_risk_results WHERE user_id = ? ORDER BY created_at DESC LIMIT 50", [userId]);
 
@@ -492,7 +492,7 @@ app.post("/auth/reset-password", async (req, res) => {
 // New feature routes
 app.get("/accounts/:id/diet-plans", async (req, res) => {
   try {
-    const [rows] = await pool.execute("SELECT * FROM DietPlan WHERE userID = ? ORDER BY startDate DESC", [req.params.id]);
+    const [rows] = await pool.execute("SELECT * FROM dietplan WHERE userID = ? ORDER BY startDate DESC", [req.params.id]);
     res.json({ ok: true, plans: rows });
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
@@ -501,7 +501,7 @@ app.post("/accounts/:id/diet-plans", async (req, res) => {
   const { planName, dailyCalories, proteinGoal, carbGoal, fatGoal, startDate, endDate, planStatus } = req.body;
   try {
     await pool.execute(
-      "INSERT INTO DietPlan (userID, planName, dailyCalories, proteinGoal, carbGoal, fatGoal, startDate, endDate, planStatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO dietplan (userID, planName, dailyCalories, proteinGoal, carbGoal, fatGoal, startDate, endDate, planStatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [req.params.id, planName, dailyCalories, proteinGoal, carbGoal, fatGoal, startDate, endDate, planStatus || 'active']
     );
     res.status(201).json({ ok: true });
@@ -510,7 +510,7 @@ app.post("/accounts/:id/diet-plans", async (req, res) => {
 
 app.get("/accounts/:id/food-logs", async (req, res) => {
   try {
-    const [rows] = await pool.execute("SELECT * FROM FoodLog WHERE userID = ? ORDER BY date DESC", [req.params.id]);
+    const [rows] = await pool.execute("SELECT * FROM foodlog WHERE userID = ? ORDER BY date DESC", [req.params.id]);
     res.json({ ok: true, logs: rows });
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
@@ -528,7 +528,7 @@ app.post("/accounts/:id/food-logs", async (req, res) => {
 
   try {
     await pool.execute(
-      "INSERT INTO FoodLog (userID, date, mealName, calories, protein, carbs, fats, waterintake) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO foodlog (userID, date, mealName, calories, protein, carbs, fats, waterintake) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       [userId, targetDate, mealName, cleanCalories, cleanProtein, cleanCarbs, cleanFats, cleanWater]
     );
     res.status(201).json({ ok: true });
@@ -541,7 +541,7 @@ app.post("/accounts/:id/food-logs", async (req, res) => {
 app.delete("/accounts/:id/food-logs/:logId", async (req, res) => {
   try {
     await pool.execute(
-      "DELETE FROM FoodLog WHERE userID = ? AND foodLogiD = ?",
+      "DELETE FROM foodlog WHERE userID = ? AND foodLogiD = ?",
       [req.params.id, req.params.logId]
     );
     res.json({ ok: true });
@@ -553,7 +553,7 @@ app.delete("/accounts/:id/food-logs/:logId", async (req, res) => {
 
 app.get("/accounts/:id/mood-logs", async (req, res) => {
   try {
-    const [rows] = await pool.execute("SELECT * FROM MoodLog WHERE userID = ? ORDER BY date DESC", [req.params.id]);
+    const [rows] = await pool.execute("SELECT * FROM moodlog WHERE userID = ? ORDER BY date DESC", [req.params.id]);
     res.json({ ok: true, logs: rows });
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
@@ -571,20 +571,20 @@ app.post("/accounts/:id/mood-logs", async (req, res) => {
 
   try {
     const [existing] = await pool.execute(
-      "SELECT moodLogiD FROM MoodLog WHERE userID = ? AND date = ?",
+      "SELECT moodLogiD FROM moodlog WHERE userID = ? AND date = ?",
       [userId, targetDate]
     );
 
     if (existing.length > 0) {
       await pool.execute(
-        `UPDATE MoodLog SET 
+        `UPDATE moodlog SET 
           moodLevel = ?, stressLevel = ?, cravingLevel = ?, sleepHours = ?, motivationLevel = ?, consistencyStatus = ?
          WHERE userID = ? AND date = ?`,
         [cleanMood, cleanStress, cleanCravings, cleanSleep, cleanMotivation, cleanConsistency, userId, targetDate]
       );
     } else {
       await pool.execute(
-        `INSERT INTO MoodLog 
+        `INSERT INTO moodlog 
           (userID, date, moodLevel, stressLevel, cravingLevel, sleepHours, motivationLevel, consistencyStatus) 
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [userId, targetDate, cleanMood, cleanStress, cleanCravings, cleanSleep, cleanMotivation, cleanConsistency]
@@ -593,14 +593,14 @@ app.post("/accounts/:id/mood-logs", async (req, res) => {
 
     res.status(201).json({ ok: true });
   } catch (error) {
-    console.error("MoodLog POST error:", error);
+    console.error("moodlog POST error:", error);
     res.status(500).json({ message: error.message });
   }
 });
 
 app.get("/accounts/:id/progress", async (req, res) => {
   try {
-    const [rows] = await pool.execute("SELECT * FROM ProgressTracking WHERE userID = ? ORDER BY date DESC", [req.params.id]);
+    const [rows] = await pool.execute("SELECT * FROM progresstracking WHERE userID = ? ORDER BY date DESC", [req.params.id]);
     res.json({ ok: true, progress: rows });
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
@@ -609,7 +609,7 @@ app.post("/accounts/:id/progress", async (req, res) => {
   const { date, weight, bodyMeasurement, progressNote, consistencyScore } = req.body;
   try {
     await pool.execute(
-      "INSERT INTO ProgressTracking (userID, date, weight, bodyMeasurement, progressNote, consistencyScore) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO progresstracking (userID, date, weight, bodyMeasurement, progressNote, consistencyScore) VALUES (?, ?, ?, ?, ?, ?)",
       [req.params.id, date || new Date().toISOString().slice(0, 10), weight, bodyMeasurement, progressNote, consistencyScore]
     );
     res.status(201).json({ ok: true });
@@ -689,11 +689,11 @@ app.delete("/admin/accounts/:id", async (req, res) => {
       { name: "daily_checkins", col: "user_id" },
       { name: "wearable_data", col: "userID" },
       { name: "feedback", col: "user_id" },
-      { name: "DietPlan", col: "userID" },
-      { name: "FoodLog", col: "userID" },
-      { name: "MoodLog", col: "userID" },
-      { name: "ProgressTracking", col: "userID" },
-      { name: "PredictionResult", col: "userID" },
+      { name: "dietplan", col: "userID" },
+      { name: "foodlog", col: "userID" },
+      { name: "moodlog", col: "userID" },
+      { name: "progresstracking", col: "userID" },
+      { name: "predictionresult", col: "userID" },
       { name: "Recommendations", col: "userID" },
       { name: "failure_risk_results", col: "user_id" },
       { name: "notification_log", col: "user_id" }
@@ -968,23 +968,23 @@ app.post("/accounts/:id/daily-checkin", async (req, res) => {
     );
 
     try {
-      // Also save/update MoodLog table to keep in sync.
+      // Also save/update moodlog table to keep in sync.
       if (cleanMood !== null || cleanStress !== null || cleanCravings !== null || cleanSleep !== null) {
         const [existingMoodLogs] = await pool.execute(
-          "SELECT moodLogiD FROM MoodLog WHERE userID = ? AND date = ?",
+          "SELECT moodLogiD FROM moodlog WHERE userID = ? AND date = ?",
           [userId, targetDate]
         );
 
         if (existingMoodLogs.length > 0) {
           await pool.execute(
-            `UPDATE MoodLog SET 
+            `UPDATE moodlog SET 
               moodLevel = ?, stressLevel = ?, cravingLevel = ?, sleepHours = ?
              WHERE userID = ? AND date = ?`,
             [cleanMood, cleanStress, cleanCravings, cleanSleep, userId, targetDate]
           );
         } else {
           await pool.execute(
-            `INSERT INTO MoodLog 
+            `INSERT INTO moodlog 
               (userID, date, moodLevel, stressLevel, cravingLevel, sleepHours, motivationLevel, consistencyStatus) 
              VALUES (?, ?, ?, ?, ?, ?, 5, 'tracked')`,
             [userId, targetDate, cleanMood, cleanStress, cleanCravings, cleanSleep]
@@ -1044,7 +1044,7 @@ app.delete("/accounts/:id/daily-checkin/:date", async (req, res) => {
     );
 
     await pool.execute(
-      "DELETE FROM MoodLog WHERE userID = ? AND date = ?",
+      "DELETE FROM moodlog WHERE userID = ? AND date = ?",
       [userId, targetDate]
     );
 
@@ -1569,7 +1569,7 @@ app.post("/ai/predictions", async (req, res) => {
         if (!p || !p.title) continue;
         try {
           const [predictionResult] = await pool.execute(
-            "INSERT INTO PredictionResult (userID, date, riskLevel, successProbability, predictionStatus, reason) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO predictionresult (userID, date, riskLevel, successProbability, predictionStatus, reason) VALUES (?, ?, ?, ?, ?, ?)",
             [userId, today, p.level || 'Low', (p.probability !== undefined ? p.probability : 50) / 100, p.title, p.description || '']
           );
 
