@@ -53,9 +53,14 @@ AI_MODEL=your_ai_model
 EMAIL_USER=you@example.com
 EMAIL_PASS=your_email_app_password
 EMAIL_NAME=Reality Engine X
+ADMIN_USERNAME=admin
+ADMIN_EMAIL=admin@realityenginex.local
+ADMIN_PASSWORD=choose_a_secure_admin_password
 ```
 
 If Railway names your database service something other than `MySQL`, replace `MySQL` in the variable references with the exact Railway service name.
+
+When `ADMIN_PASSWORD` is configured, the backend creates or updates the admin account on startup.
 
 The backend deploy start command is configured in `backend/railway.json`:
 

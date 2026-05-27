@@ -159,6 +159,38 @@ async function ensureDailyCheckinsTable() {
   );
 }
 
+async function seedAdminUser() {
+  const adminPassword = String(process.env.ADMIN_PASSWORD || "").trim();
+
+  if (!adminPassword) {
+    console.log("Admin seed skipped: ADMIN_PASSWORD is not configured.");
+    return;
+  }
+
+  const adminId = String(process.env.ADMIN_USER_ID || "admin-001").trim();
+  const adminName = String(process.env.ADMIN_NAME || "Admin").trim();
+  const adminUsername = String(process.env.ADMIN_USERNAME || "admin").trim().toLowerCase();
+  const adminEmail = String(process.env.ADMIN_EMAIL || "admin@realityenginex.local").trim().toLowerCase();
+  const hashedPassword = await bcrypt.hash(adminPassword, 10);
+
+  await pool.execute(
+    `INSERT INTO users (userID, fullName, name, username, email, password, role)
+     VALUES (?, ?, ?, ?, ?, ?, 'admin')
+     ON DUPLICATE KEY UPDATE
+       fullName = VALUES(fullName),
+       name = VALUES(name),
+       username = VALUES(username),
+       email = VALUES(email),
+       password = VALUES(password),
+       role = 'admin'`,
+    [adminId, adminName, adminName, adminUsername, adminEmail, hashedPassword]
+  );
+
+  await pool.execute("INSERT IGNORE INTO diet_profiles (user_id, completed) VALUES (?, ?)", [adminId, false]);
+  await pool.execute("INSERT IGNORE INTO user_preferences (user_id) VALUES (?)", [adminId]);
+  console.log(`Admin user ensured: ${adminUsername}`);
+}
+
 // Ensure tables exist
 async function initDb() {
   try {
@@ -415,6 +447,8 @@ async function initDb() {
         ('banana', 'Banana', 89.00, 1.10, 22.80, 0.30),
         ('olive-oil', 'Olive oil', 884.00, 0.00, 0.00, 100.00)
     `);
+
+    await seedAdminUser();
 
     console.log("Database initialized.");
   } catch (error) {
