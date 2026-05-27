@@ -59,6 +59,14 @@ export const apiClient = {
     });
   },
 
+  patch(path, payload, options) {
+    return request(path, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+      ...options
+    });
+  },
+
   delete(path, options) {
     return request(path, { method: "DELETE", ...options });
   }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import "../../admin-styles.css";
-import { Eye, Edit2, Trash2, X, Search, UserCheck, Shield } from "lucide-react";
+import { Eye, Edit2, Trash2, X, Search, UserCheck, Shield, ShieldCheck, ShieldOff } from "lucide-react";
 import SectionHeader from "../../../../components/shared/SectionHeader";
 import Button from "../../../../components/ui/Button";
 import Input from "../../../../components/ui/Input";
@@ -54,8 +54,26 @@ export default function Users({ setActiveRoute }) {
         setUsers(users.filter((u) => u.id !== id));
         if (selectedUser?.id === id) setSelectedUser(null);
       } catch (error) {
-        alert("Failed to delete user");
+        alert(error.message || "Failed to delete user");
       }
+    }
+  };
+
+  const handleRoleChange = async (user, role) => {
+    const action = role === "admin" ? "make this user an admin" : "remove admin access from this account";
+
+    if (!window.confirm(`Are you sure you want to ${action}?`)) return;
+
+    try {
+      const response = await apiClient.patch(`/admin/accounts/${user.id}/role`, { role });
+      const updatedUser = response.account
+        ? { ...response.account, id: response.account.id, name: response.account.fullName || response.account.name }
+        : { ...user, role };
+
+      setUsers(users.map((item) => item.id === user.id ? updatedUser : item));
+      if (selectedUser?.id === user.id) setSelectedUser(updatedUser);
+    } catch (error) {
+      alert(error.message || "Failed to update user role");
     }
   };
 
@@ -174,6 +192,11 @@ export default function Users({ setActiveRoute }) {
                     <td className="actions-cell">
                       <button className="action-btn view" title="View" onClick={() => handleView(user)}><Eye size={16} /></button>
                       <button className="action-btn edit" title="Edit" onClick={() => handleEdit(user)}><Edit2 size={16} /></button>
+                      {(user.role || "user") === "admin" ? (
+                        <button className="action-btn role" title="Make user" onClick={() => handleRoleChange(user, "user")}><ShieldOff size={16} /></button>
+                      ) : (
+                        <button className="action-btn role" title="Make admin" onClick={() => handleRoleChange(user, "admin")}><ShieldCheck size={16} /></button>
+                      )}
                       <button className="action-btn delete" title="Delete" onClick={() => handleDelete(user.id)}><Trash2 size={16} /></button>
                     </td>
                   </tr>
@@ -292,6 +315,15 @@ export default function Users({ setActiveRoute }) {
                   <Button variant="ghost" className="full-width" onClick={() => handleEdit(selectedUser)}>
                     <Edit2 size={16} /> Edit Profile
                   </Button>
+                  {(selectedUser.role || "user") === "admin" ? (
+                    <Button variant="ghost" className="full-width" onClick={() => handleRoleChange(selectedUser, "user")}>
+                      <ShieldOff size={16} /> Make User
+                    </Button>
+                  ) : (
+                    <Button variant="outline" className="full-width" onClick={() => handleRoleChange(selectedUser, "admin")}>
+                      <ShieldCheck size={16} /> Make Admin
+                    </Button>
+                  )}
                   <Button variant="outline" className="full-width delete-btn" onClick={() => handleDelete(selectedUser.id)}>
                     <Trash2 size={16} /> Delete Account
                   </Button>

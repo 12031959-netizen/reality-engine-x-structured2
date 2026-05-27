@@ -893,7 +893,7 @@ app.post("/accounts/:id/progress", async (req, res) => {
 // Admin: Get all accounts
 app.get("/admin/accounts", async (req, res) => {
   try {
-    const [users] = await pool.execute("SELECT userID, fullName, username, email, role, created_at FROM users WHERE role != 'admin' ORDER BY created_at DESC");
+    const [users] = await pool.execute("SELECT userID, fullName, name, username, email, role, created_at FROM users ORDER BY created_at DESC");
 
     const fullAccounts = await Promise.all(users.map(async (u) => {
       const [profiles] = await pool.execute("SELECT * FROM diet_profiles WHERE user_id = ?", [u.userID]);
@@ -905,7 +905,7 @@ app.get("/admin/accounts", async (req, res) => {
       return {
         ...u,
         id: u.userID,
-        name: u.fullName,
+        name: u.fullName || u.name,
         dietProfile: {
           personName: profile.person_name,
           age: profile.age,
@@ -952,10 +952,55 @@ app.get("/admin/accounts", async (req, res) => {
   } catch (error) { res.status(500).json({ message: error.message }); }
 });
 
+// Admin: Promote or demote an account
+app.patch("/admin/accounts/:id/role", async (req, res) => {
+  const userId = req.params.id;
+  const role = String(req.body.role || "").trim().toLowerCase();
+
+  if (!["admin", "user"].includes(role)) {
+    return res.status(400).json({ ok: false, message: "Role must be admin or user." });
+  }
+
+  try {
+    const [users] = await pool.execute("SELECT userID, role FROM users WHERE userID = ?", [userId]);
+
+    if (users.length === 0) {
+      return res.status(404).json({ ok: false, message: "User not found." });
+    }
+
+    if (users[0].role === "admin" && role === "user") {
+      const [[adminCount]] = await pool.execute("SELECT COUNT(*) AS count FROM users WHERE role = 'admin'");
+      if (Number(adminCount.count) <= 1) {
+        return res.status(409).json({ ok: false, message: "At least one admin account is required." });
+      }
+    }
+
+    await pool.execute("UPDATE users SET role = ? WHERE userID = ?", [role, userId]);
+    const account = await getFullUser(userId);
+    res.json({ ok: true, account });
+  } catch (error) {
+    console.error("PATCH /admin/accounts/:id/role error:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // Admin: Delete an account and all its related data
 app.delete("/admin/accounts/:id", async (req, res) => {
   const userId = req.params.id;
   try {
+    const [users] = await pool.execute("SELECT userID, role FROM users WHERE userID = ?", [userId]);
+
+    if (users.length === 0) {
+      return res.status(404).json({ ok: false, message: "User not found." });
+    }
+
+    if (users[0].role === "admin") {
+      const [[adminCount]] = await pool.execute("SELECT COUNT(*) AS count FROM users WHERE role = 'admin'");
+      if (Number(adminCount.count) <= 1) {
+        return res.status(409).json({ ok: false, message: "At least one admin account is required." });
+      }
+    }
+
     const tables = [
       { name: "users", col: "userID" },
       { name: "diet_profiles", col: "user_id" },

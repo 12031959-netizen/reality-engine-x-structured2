@@ -143,6 +143,7 @@
 
 .action-btn.view:hover { color: var(--primary); }
 .action-btn.edit:hover { color: var(--success); }
+.action-btn.role:hover { color: #f59e0b; border-color: #f59e0b; }
 .action-btn.delete:hover { color: var(--danger); border-color: var(--danger); }
 .action-btn.cancel:hover { color: var(--text-muted); }
 
