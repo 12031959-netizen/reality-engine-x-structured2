@@ -162,6 +162,71 @@ async function ensureDailyCheckinsTable() {
 // Ensure tables exist
 async function initDb() {
   try {
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS users (
+        userID VARCHAR(50) NOT NULL,
+        fullName VARCHAR(255) DEFAULT NULL,
+        name VARCHAR(100) DEFAULT NULL,
+        phone VARCHAR(20) DEFAULT NULL,
+        username VARCHAR(50) NOT NULL,
+        email VARCHAR(100) NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        role VARCHAR(20) DEFAULT 'user',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        age INT DEFAULT NULL,
+        gender VARCHAR(50) DEFAULT NULL,
+        height DECIMAL(5,2) DEFAULT NULL,
+        currentWeight DECIMAL(5,2) DEFAULT NULL,
+        targetWeight DECIMAL(5,2) DEFAULT NULL,
+        activityLevel VARCHAR(100) DEFAULT NULL,
+        healthGoal VARCHAR(255) DEFAULT NULL,
+        PRIMARY KEY (userID),
+        UNIQUE KEY username (username),
+        UNIQUE KEY email (email)
+      )
+    `);
+
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS diet_profiles (
+        user_id VARCHAR(50) NOT NULL,
+        person_name VARCHAR(100) DEFAULT NULL,
+        age INT DEFAULT NULL,
+        gender VARCHAR(20) DEFAULT NULL,
+        height_cm DECIMAL(5,2) DEFAULT NULL,
+        current_weight_kg DECIMAL(5,2) DEFAULT NULL,
+        target_weight_kg DECIMAL(5,2) DEFAULT NULL,
+        goal VARCHAR(50) DEFAULT NULL,
+        activity_level VARCHAR(50) DEFAULT NULL,
+        diet_style VARCHAR(50) DEFAULT NULL,
+        meals_per_day INT DEFAULT NULL,
+        allergies TEXT,
+        health_conditions TEXT,
+        target_date DATE DEFAULT NULL,
+        notes TEXT,
+        completed BOOLEAN DEFAULT FALSE,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id)
+      )
+    `);
+
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS user_preferences (
+        user_id VARCHAR(50) NOT NULL,
+        daily_reminders BOOLEAN DEFAULT TRUE,
+        risk_alerts BOOLEAN DEFAULT TRUE,
+        weekly_summary BOOLEAN DEFAULT FALSE,
+        private_mode BOOLEAN DEFAULT FALSE,
+        hourly_reminders BOOLEAN DEFAULT TRUE,
+        app_notifications BOOLEAN DEFAULT FALSE,
+        email_notifications BOOLEAN DEFAULT FALSE,
+        remind_mood BOOLEAN DEFAULT TRUE,
+        remind_food BOOLEAN DEFAULT TRUE,
+        remind_water BOOLEAN DEFAULT TRUE,
+        PRIMARY KEY (user_id)
+      )
+    `);
+
     await ensureDailyCheckinsTable();
 
     await pool.execute(`
@@ -175,6 +240,40 @@ async function initDb() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS dietplan (
+        planID INT NOT NULL AUTO_INCREMENT,
+        userID VARCHAR(50) DEFAULT NULL,
+        planName VARCHAR(255) DEFAULT NULL,
+        dailyCalories INT DEFAULT NULL,
+        proteinGoal INT DEFAULT NULL,
+        carbGoal INT DEFAULT NULL,
+        fatGoal INT DEFAULT NULL,
+        startDate DATE DEFAULT NULL,
+        endDate DATE DEFAULT NULL,
+        planStatus VARCHAR(50) DEFAULT NULL,
+        PRIMARY KEY (planID),
+        KEY userID (userID)
+      )
+    `);
+
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS foodlog (
+        foodLogiD INT NOT NULL AUTO_INCREMENT,
+        userID VARCHAR(50) DEFAULT NULL,
+        date DATE DEFAULT NULL,
+        mealName VARCHAR(255) DEFAULT NULL,
+        calories INT DEFAULT NULL,
+        protein INT DEFAULT NULL,
+        carbs INT DEFAULT NULL,
+        fats INT DEFAULT NULL,
+        waterintake DECIMAL(5,2) DEFAULT NULL,
+        PRIMARY KEY (foodLogiD),
+        KEY userID (userID)
+      )
+    `);
+
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS food_catalog (
         id VARCHAR(80) PRIMARY KEY,
@@ -186,6 +285,104 @@ async function initDb() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS moodlog (
+        moodLogiD INT NOT NULL AUTO_INCREMENT,
+        userID VARCHAR(50) DEFAULT NULL,
+        date DATE DEFAULT NULL,
+        moodLevel INT DEFAULT NULL,
+        stressLevel INT DEFAULT NULL,
+        cravingLevel INT DEFAULT NULL,
+        sleepHours DECIMAL(4,2) DEFAULT NULL,
+        motivationLevel INT DEFAULT NULL,
+        consistencyStatus VARCHAR(50) DEFAULT NULL,
+        PRIMARY KEY (moodLogiD),
+        KEY userID (userID)
+      )
+    `);
+
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS predictionresult (
+        predictionID INT NOT NULL AUTO_INCREMENT,
+        userID VARCHAR(50) DEFAULT NULL,
+        date DATE DEFAULT NULL,
+        riskLevel VARCHAR(50) DEFAULT NULL,
+        successProbability DECIMAL(5,2) DEFAULT NULL,
+        failureProbability DECIMAL(5,2) DEFAULT NULL,
+        predictionStatus VARCHAR(50) DEFAULT NULL,
+        reason TEXT,
+        PRIMARY KEY (predictionID),
+        KEY userID (userID)
+      )
+    `);
+
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS progresstracking (
+        progressID INT NOT NULL AUTO_INCREMENT,
+        userID VARCHAR(50) DEFAULT NULL,
+        date DATE DEFAULT NULL,
+        weight DECIMAL(5,2) DEFAULT NULL,
+        bodyMeasurement TEXT,
+        progressNote TEXT,
+        consistencyScore INT DEFAULT NULL,
+        PRIMARY KEY (progressID),
+        KEY userID (userID)
+      )
+    `);
+
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS recommendations (
+        recommendationID INT NOT NULL AUTO_INCREMENT,
+        userID VARCHAR(50) DEFAULT NULL,
+        predictionID INT DEFAULT NULL,
+        recommendationText TEXT,
+        recommendationType VARCHAR(100) DEFAULT NULL,
+        date DATE DEFAULT NULL,
+        PRIMARY KEY (recommendationID),
+        KEY userID (userID),
+        KEY predictionID (predictionID)
+      )
+    `);
+
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS wearable_data (
+        wearablelD INT NOT NULL AUTO_INCREMENT,
+        userID VARCHAR(50) DEFAULT NULL,
+        date DATE DEFAULT NULL,
+        device VARCHAR(100) DEFAULT NULL,
+        steps INT DEFAULT NULL,
+        heartRate INT DEFAULT NULL,
+        activityMinutes INT DEFAULT NULL,
+        recovery_score INT DEFAULT NULL,
+        source VARCHAR(100) DEFAULT NULL,
+        apple_health_active BOOLEAN DEFAULT FALSE,
+        iphone_active BOOLEAN DEFAULT FALSE,
+        export_active BOOLEAN DEFAULT FALSE,
+        bluetooth_active BOOLEAN DEFAULT FALSE,
+        saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        sleepDuration DECIMAL(5,2) DEFAULT NULL,
+        caloriesBurned INT DEFAULT NULL,
+        PRIMARY KEY (wearablelD),
+        UNIQUE KEY user_wearable_date_unique (userID, date)
+      )
+    `);
+
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS feedback (
+        id BIGINT NOT NULL,
+        user_id VARCHAR(50) NOT NULL,
+        author VARCHAR(100) DEFAULT NULL,
+        title VARCHAR(255) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        rating INT DEFAULT NULL,
+        message TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY user_id (user_id)
+      )
+    `);
+
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS failure_risk_results (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -199,6 +396,24 @@ async function initDb() {
         metrics JSON,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    await pool.execute(`
+      INSERT IGNORE INTO food_catalog (id, name, calories, protein, carbs, fats) VALUES
+        ('chicken-breast', 'Chicken breast cooked', 165.00, 31.00, 0.00, 3.60),
+        ('chicken-thigh', 'Chicken thigh cooked', 209.00, 26.00, 0.00, 10.90),
+        ('white-rice-cooked', 'White rice cooked', 130.00, 2.70, 28.00, 0.30),
+        ('brown-rice-cooked', 'Brown rice cooked', 123.00, 2.70, 25.60, 1.00),
+        ('pasta-cooked', 'Pasta cooked', 158.00, 5.80, 30.90, 0.90),
+        ('potato-boiled', 'Potato boiled', 87.00, 1.90, 20.10, 0.10),
+        ('oats-dry', 'Oats dry', 389.00, 16.90, 66.30, 6.90),
+        ('egg-whole', 'Whole egg', 143.00, 12.60, 0.70, 9.50),
+        ('tuna-water', 'Tuna in water', 116.00, 25.50, 0.00, 0.80),
+        ('lean-beef', 'Lean beef cooked', 217.00, 26.10, 0.00, 11.80),
+        ('salmon', 'Salmon cooked', 206.00, 22.10, 0.00, 12.40),
+        ('greek-yogurt', 'Greek yogurt plain', 59.00, 10.30, 3.60, 0.40),
+        ('banana', 'Banana', 89.00, 1.10, 22.80, 0.30),
+        ('olive-oil', 'Olive oil', 884.00, 0.00, 0.00, 100.00)
     `);
 
     console.log("Database initialized.");
@@ -440,8 +655,8 @@ app.post("/auth/signup", async (req, res) => {
     const hashedPassword = await bcrypt.hash(payload.password, 10);
 
     await pool.execute(
-      "INSERT INTO users (userID, fullName, username, email, password, role) VALUES (?, ?, ?, ?, ?, ?)",
-      [userId, payload.name, payload.username, payload.email, hashedPassword, "user"]
+      "INSERT INTO users (userID, fullName, name, username, email, password, role) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [userId, payload.name, payload.name, payload.username, payload.email, hashedPassword, "user"]
     );
 
     await pool.execute("INSERT INTO diet_profiles (user_id, completed) VALUES (?, ?)", [userId, false]);
