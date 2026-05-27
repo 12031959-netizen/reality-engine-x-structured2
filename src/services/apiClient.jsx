@@ -3,6 +3,10 @@ import { env } from "../config/env";
 async function request(path, options = {}) {
   let response;
 
+  if (!env.apiBaseUrl) {
+    throw new Error("VITE_API_BASE_URL is missing. Set it in Vercel to your hosted backend URL, then redeploy.");
+  }
+
   try {
     response = await fetch(`${env.apiBaseUrl}${path}`, {
       ...options,
@@ -13,7 +17,7 @@ async function request(path, options = {}) {
     });
   } catch (error) {
     throw new Error(
-      `Cannot reach the API at ${env.apiBaseUrl}. Start the backend server and make sure WAMP/MySQL is running.`
+      `Cannot reach the API at ${env.apiBaseUrl}. Make sure the hosted backend is deployed and running.`
     );
   }
 
