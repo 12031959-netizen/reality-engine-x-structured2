@@ -443,7 +443,7 @@ async function getFullUser(userId) {
   const [moodLogs] = await pool.execute("SELECT *, DATE_FORMAT(date, '%Y-%m-%d') as date FROM moodlog WHERE userID = ? ORDER BY date DESC", [userId]);
   const [progress] = await pool.execute("SELECT progressID, userID, DATE_FORMAT(date, '%Y-%m-%d') as date, weight, bodyMeasurement, progressNote, consistencyScore FROM progresstracking WHERE userID = ? ORDER BY date DESC", [userId]);
   const [predictions] = await pool.execute("SELECT *, DATE_FORMAT(date, '%Y-%m-%d') as date FROM predictionresult WHERE userID = ? ORDER BY date DESC", [userId]);
-  const [recs] = await pool.execute("SELECT *, DATE_FORMAT(date, '%Y-%m-%d') as date FROM Recommendations WHERE userID = ? ORDER BY date DESC", [userId]);
+  const [recs] = await pool.execute("SELECT *, DATE_FORMAT(date, '%Y-%m-%d') as date FROM recommendations WHERE userID = ? ORDER BY date DESC", [userId]);
   const [failureRisks] = await pool.execute("SELECT id, user_id, DATE_FORMAT(check_in_date, '%Y-%m-%d') as checkInDate, risk_score as riskScore, risk_level as riskLevel, risk_message as riskMessage, reasons, insights, metrics, created_at as createdAt FROM failure_risk_results WHERE user_id = ? ORDER BY created_at DESC LIMIT 50", [userId]);
 
   console.log(`[getFullUser] ID: ${userId}, Progress Entries: ${progress.length}`);
@@ -934,7 +934,7 @@ app.delete("/admin/accounts/:id", async (req, res) => {
       { name: "moodlog", col: "userID" },
       { name: "progresstracking", col: "userID" },
       { name: "predictionresult", col: "userID" },
-      { name: "Recommendations", col: "userID" },
+      { name: "recommendations", col: "userID" },
       { name: "failure_risk_results", col: "user_id" },
       { name: "notification_log", col: "user_id" }
     ];
@@ -1815,7 +1815,7 @@ app.post("/ai/predictions", async (req, res) => {
 
           const recommendationText = buildRecommendationText(p);
           await pool.execute(
-            "INSERT INTO Recommendations (userID, predictionID, recommendationText, recommendationType, date) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO recommendations (userID, predictionID, recommendationText, recommendationType, date) VALUES (?, ?, ?, ?, ?)",
             [userId, predictionResult.insertId || null, recommendationText, p.title || "AI recommendation", today]
           );
         } catch (dbErr) {
