@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+
+backend/data/
+backend/*.log
+database/*.sql
+mobileapp/
+scratch/
+*.zip
+.vscode/
+
+.DS_Store
+Thumbs.db

@@ -1,0 +1,33 @@
+{
+  "name": "reality-engine-x",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Reality Engine X - Smart diet management and failure prediction system",
+  "scripts": {
+    "api": "node backend/server.js",
+    "dev": "vite --host 0.0.0.0",
+    "dev:api": "node backend/server.js",
+    "dev:all": "concurrently \"npm run dev\" \"npm run api\"",
+    "start": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "lucide-react": "^0.468.0",
+    "mysql2": "^3.22.3",
+    "nodemailer": "^8.0.7",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "recharts": "^2.13.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "4.3.4",
+    "concurrently": "^9.2.1",
+    "vite": "5.4.11"
+  }
+}
