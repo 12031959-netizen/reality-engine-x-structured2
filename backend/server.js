@@ -13,6 +13,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 5000;
 const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 10000);
+const RESEND_API_URL = "https://api.resend.com/emails";
 
 app.use(cors());
 app.use(express.json());
@@ -29,7 +30,23 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
+function getEmailProvider() {
+  return process.env.RESEND_API_KEY ? "resend" : "smtp";
+}
+
+function getEmailFrom() {
+  if (process.env.EMAIL_FROM) return process.env.EMAIL_FROM;
+  if (process.env.EMAIL_USER) {
+    return `"${process.env.EMAIL_NAME || "Reality Engine X"}" <${process.env.EMAIL_USER}>`;
+  }
+  return `"${process.env.EMAIL_NAME || "Reality Engine X"}" <onboarding@resend.dev>`;
+}
+
 function isEmailConfigured() {
+  if (getEmailProvider() === "resend") {
+    return Boolean(process.env.RESEND_API_KEY);
+  }
+
   return Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS);
 }
 
@@ -64,7 +81,7 @@ function createEmailTransporter() {
 }
 
 // Email Transporter
-const transporter = createEmailTransporter();
+const transporter = getEmailProvider() === "smtp" ? createEmailTransporter() : null;
 
 function withTimeout(promise, timeoutMs, message) {
   let timeoutId;
@@ -75,26 +92,84 @@ function withTimeout(promise, timeoutMs, message) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
 }
 
+async function sendResendEmail({ to, subject, text }) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), EMAIL_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(RESEND_API_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from: getEmailFrom(),
+        to: [to],
+        subject,
+        text
+      }),
+      signal: controller.signal
+    });
+
+    const rawBody = await response.text();
+    let body = {};
+
+    try {
+      body = rawBody ? JSON.parse(rawBody) : {};
+    } catch {
+      body = { message: rawBody };
+    }
+
+    if (!response.ok) {
+      const providerMessage = body.message || body.error?.message || rawBody;
+      throw new Error(providerMessage || `Resend request failed with HTTP ${response.status}.`);
+    }
+
+    return { sent: true, error: null, providerId: body.id || null };
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error(`Resend email request timed out after ${EMAIL_TIMEOUT_MS / 1000} seconds.`);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function sendSmtpEmail({ to, subject, text }) {
+  await withTimeout(
+    transporter.sendMail({
+      from: getEmailFrom(),
+      to,
+      subject,
+      text
+    }),
+    EMAIL_TIMEOUT_MS,
+    `Email sending timed out after ${EMAIL_TIMEOUT_MS / 1000} seconds. Check Railway EMAIL_USER/EMAIL_PASS or SMTP settings.`
+  );
+}
+
 async function sendEmail({ to, subject, text }) {
   if (!isEmailConfigured()) {
-    console.error("Email sending skipped: EMAIL_USER or EMAIL_PASS is not configured.");
+    console.error("Email sending skipped: email provider is not configured.");
     return {
       sent: false,
-      error: "EMAIL_USER or EMAIL_PASS is not configured on the backend host."
+      error:
+        getEmailProvider() === "resend"
+          ? "RESEND_API_KEY is not configured on the backend host."
+          : "EMAIL_USER or EMAIL_PASS is not configured on the backend host."
     };
   }
 
   try {
-    await withTimeout(
-      transporter.sendMail({
-        from: `"${process.env.EMAIL_NAME}" <${process.env.EMAIL_USER}>`,
-        to,
-        subject,
-        text
-      }),
-      EMAIL_TIMEOUT_MS,
-      `Email sending timed out after ${EMAIL_TIMEOUT_MS / 1000} seconds. Check Railway EMAIL_USER/EMAIL_PASS or SMTP settings.`
-    );
+    if (getEmailProvider() === "resend") {
+      await sendResendEmail({ to, subject, text });
+    } else {
+      await sendSmtpEmail({ to, subject, text });
+    }
+
     return { sent: true, error: null };
   } catch (error) {
     console.error("Email sending failed:", error);
@@ -705,13 +780,28 @@ app.get("/db-health", async (req, res) => {
 });
 
 app.get("/email-health", async (req, res) => {
+  const provider = getEmailProvider();
   const configured = isEmailConfigured();
 
   if (!configured) {
     return res.status(503).json({
       ok: false,
       configured: false,
-      message: "EMAIL_USER and EMAIL_PASS must be configured on Railway."
+      provider,
+      message:
+        provider === "resend"
+          ? "RESEND_API_KEY must be configured on Railway."
+          : "EMAIL_USER and EMAIL_PASS must be configured on Railway."
+    });
+  }
+
+  if (provider === "resend") {
+    return res.json({
+      ok: true,
+      configured: true,
+      from: getEmailFrom(),
+      provider,
+      message: "Resend is configured. Send a notification to test delivery."
     });
   }
 
@@ -720,14 +810,14 @@ app.get("/email-health", async (req, res) => {
     res.json({
       ok: true,
       configured: true,
-      from: process.env.EMAIL_USER,
+      from: getEmailFrom(),
       provider: process.env.SMTP_HOST || "gmail"
     });
   } catch (error) {
     res.status(500).json({
       ok: false,
       configured: true,
-      from: process.env.EMAIL_USER,
+      from: getEmailFrom(),
       provider: process.env.SMTP_HOST || "gmail",
       message: error.message
     });

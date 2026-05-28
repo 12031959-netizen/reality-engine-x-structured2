@@ -54,6 +54,11 @@ EMAIL_USER=you@example.com
 EMAIL_PASS=your_email_app_password
 EMAIL_NAME=Reality Engine X
 EMAIL_TIMEOUT_MS=10000
+
+# Recommended for Railway email delivery. If set, this is used instead of SMTP/Gmail.
+RESEND_API_KEY=your_resend_api_key
+EMAIL_FROM=Reality Engine X <onboarding@resend.dev>
+
 # Optional custom SMTP. Leave blank to use Gmail service.
 SMTP_HOST=
 SMTP_PORT=587
@@ -84,6 +89,14 @@ To test email settings:
 ```bash
 https://your-backend-url.up.railway.app/email-health
 ```
+
+If Gmail returns `Connection timeout` on Railway, use Resend instead:
+
+1. Create a Resend API key.
+2. Add `RESEND_API_KEY` to the Railway backend service variables.
+3. Add `EMAIL_FROM`. For a quick test, use `Reality Engine X <onboarding@resend.dev>`. For production, use a verified domain sender.
+4. Redeploy the Railway backend.
+5. Open `/email-health`, then send a notification with `Notify by Email` enabled.
 
 ## Structure
 
