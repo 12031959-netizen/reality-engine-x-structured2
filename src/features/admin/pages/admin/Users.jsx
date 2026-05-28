@@ -89,7 +89,7 @@ export default function Users({ setActiveRoute }) {
     try {
       const result = await apiClient.post(`/accounts/${selectedUser.id}/notifications`, notifyForm);
       if (result.email?.requested && result.email.failed) {
-        alert("Notification saved, but the email could not be sent. Check the backend email settings.");
+        alert(`Notification saved, but the email could not be sent.${result.email.error ? `\n\nEmail error: ${result.email.error}` : "\n\nCheck the backend email settings."}`);
       } else if (result.email?.requested && result.email.withoutEmail) {
         alert("Notification saved, but this user does not have an email address.");
       } else if (result.email?.requested) {

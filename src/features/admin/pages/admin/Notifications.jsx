@@ -59,7 +59,8 @@ export default function Notifications({ setActiveRoute }) {
 
       const email = result.email;
       if (email?.requested && (email.failed || email.withoutEmail)) {
-        alert(`Notification saved. Email sent: ${email.sent || 0}. Failed: ${email.failed || 0}. Missing email: ${email.withoutEmail || 0}.`);
+        const errorDetails = email.error || email.errors?.join(" | ");
+        alert(`Notification saved. Email sent: ${email.sent || 0}. Failed: ${email.failed || 0}. Missing email: ${email.withoutEmail || 0}.${errorDetails ? `\n\nEmail error: ${errorDetails}` : ""}`);
       } else if (email?.requested) {
         alert(`Notification saved and email sent successfully to ${email.sent || 1} recipient(s).`);
       } else {

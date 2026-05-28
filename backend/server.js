@@ -28,19 +28,42 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
-// Email Transporter
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+function isEmailConfigured() {
+  return Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS);
+}
+
+function createEmailTransporter() {
+  if (process.env.SMTP_HOST) {
+    return nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT || 587),
+      secure: process.env.SMTP_SECURE === "true",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
   }
-});
+
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
+    }
+  });
+}
+
+// Email Transporter
+const transporter = createEmailTransporter();
 
 async function sendEmail({ to, subject, text }) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+  if (!isEmailConfigured()) {
     console.error("Email sending skipped: EMAIL_USER or EMAIL_PASS is not configured.");
-    return false;
+    return {
+      sent: false,
+      error: "EMAIL_USER or EMAIL_PASS is not configured on the backend host."
+    };
   }
 
   try {
@@ -50,10 +73,13 @@ async function sendEmail({ to, subject, text }) {
       subject,
       text
     });
-    return true;
+    return { sent: true, error: null };
   } catch (error) {
     console.error("Email sending failed:", error);
-    return false;
+    return {
+      sent: false,
+      error: error.message || "Email provider rejected the message."
+    };
   }
 }
 
@@ -90,19 +116,23 @@ async function createNotificationAndMaybeEmail(user, { title, message, text, typ
   const notification = await createNotification(user.id, { title, message, text, type });
   const emailRequested = shouldSendEmail(emailNotify);
   let emailSent = false;
+  let emailError = null;
 
   if (emailRequested && user.email) {
-    emailSent = await sendEmail({
+    const emailResult = await sendEmail({
       to: user.email,
       subject: notification.title,
       text: notification.message
     });
+    emailSent = emailResult.sent;
+    emailError = emailResult.error;
   }
 
   return {
     notification,
     emailRequested,
     emailSent,
+    emailError,
     recipient: {
       id: user.id,
       email: user.email || null
@@ -649,6 +679,36 @@ app.get("/db-health", async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ ok: false, message: error.message });
+  }
+});
+
+app.get("/email-health", async (req, res) => {
+  const configured = isEmailConfigured();
+
+  if (!configured) {
+    return res.status(503).json({
+      ok: false,
+      configured: false,
+      message: "EMAIL_USER and EMAIL_PASS must be configured on Railway."
+    });
+  }
+
+  try {
+    await transporter.verify();
+    res.json({
+      ok: true,
+      configured: true,
+      from: process.env.EMAIL_USER,
+      provider: process.env.SMTP_HOST || "gmail"
+    });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      configured: true,
+      from: process.env.EMAIL_USER,
+      provider: process.env.SMTP_HOST || "gmail",
+      message: error.message
+    });
   }
 });
 
@@ -1634,6 +1694,9 @@ app.post("/admin/notifications/broadcast", async (req, res) => {
     const withoutEmail = emailRequested
       ? results.filter((result) => !result.recipient.email).length
       : 0;
+    const emailErrors = [
+      ...new Set(results.map((result) => result.emailError).filter(Boolean))
+    ];
 
     res.json({
       ok: true,
@@ -1643,7 +1706,8 @@ app.post("/admin/notifications/broadcast", async (req, res) => {
         requested: emailRequested,
         sent: emailSent,
         failed: emailFailed,
-        withoutEmail
+        withoutEmail,
+        errors: emailErrors
       }
     });
   } catch (error) {
@@ -1693,7 +1757,8 @@ app.post("/accounts/:id/notifications", async (req, res) => {
         requested: result.emailRequested,
         sent: result.emailSent,
         failed: result.emailRequested && !!result.recipient.email && !result.emailSent,
-        withoutEmail: result.emailRequested && !result.recipient.email
+        withoutEmail: result.emailRequested && !result.recipient.email,
+        error: result.emailError
       }
     });
   } catch (error) {

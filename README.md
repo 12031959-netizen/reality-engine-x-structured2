@@ -53,6 +53,10 @@ AI_MODEL=your_ai_model
 EMAIL_USER=you@example.com
 EMAIL_PASS=your_email_app_password
 EMAIL_NAME=Reality Engine X
+# Optional custom SMTP. Leave blank to use Gmail service.
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_SECURE=false
 ADMIN_USERNAME=admin
 ADMIN_EMAIL=admin@realityenginex.local
 ADMIN_PASSWORD=choose_a_secure_admin_password
@@ -72,6 +76,12 @@ After deployment, test:
 
 ```bash
 https://your-backend-url.up.railway.app/health
+```
+
+To test email settings:
+
+```bash
+https://your-backend-url.up.railway.app/email-health
 ```
 
 ## Structure
