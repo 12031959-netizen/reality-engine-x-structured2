@@ -12,6 +12,7 @@ dotenv.config();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 5000;
+const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 10000);
 
 app.use(cors());
 app.use(express.json());
@@ -33,11 +34,18 @@ function isEmailConfigured() {
 }
 
 function createEmailTransporter() {
+  const timeoutOptions = {
+    connectionTimeout: EMAIL_TIMEOUT_MS,
+    greetingTimeout: EMAIL_TIMEOUT_MS,
+    socketTimeout: EMAIL_TIMEOUT_MS
+  };
+
   if (process.env.SMTP_HOST) {
     return nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: Number(process.env.SMTP_PORT || 587),
       secure: process.env.SMTP_SECURE === "true",
+      ...timeoutOptions,
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
@@ -47,6 +55,7 @@ function createEmailTransporter() {
 
   return nodemailer.createTransport({
     service: "gmail",
+    ...timeoutOptions,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS
@@ -56,6 +65,15 @@ function createEmailTransporter() {
 
 // Email Transporter
 const transporter = createEmailTransporter();
+
+function withTimeout(promise, timeoutMs, message) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+}
 
 async function sendEmail({ to, subject, text }) {
   if (!isEmailConfigured()) {
@@ -67,12 +85,16 @@ async function sendEmail({ to, subject, text }) {
   }
 
   try {
-    await transporter.sendMail({
-      from: `"${process.env.EMAIL_NAME}" <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      text
-    });
+    await withTimeout(
+      transporter.sendMail({
+        from: `"${process.env.EMAIL_NAME}" <${process.env.EMAIL_USER}>`,
+        to,
+        subject,
+        text
+      }),
+      EMAIL_TIMEOUT_MS,
+      `Email sending timed out after ${EMAIL_TIMEOUT_MS / 1000} seconds. Check Railway EMAIL_USER/EMAIL_PASS or SMTP settings.`
+    );
     return { sent: true, error: null };
   } catch (error) {
     console.error("Email sending failed:", error);

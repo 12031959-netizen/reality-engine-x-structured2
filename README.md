@@ -53,6 +53,7 @@ AI_MODEL=your_ai_model
 EMAIL_USER=you@example.com
 EMAIL_PASS=your_email_app_password
 EMAIL_NAME=Reality Engine X
+EMAIL_TIMEOUT_MS=10000
 # Optional custom SMTP. Leave blank to use Gmail service.
 SMTP_HOST=
 SMTP_PORT=587

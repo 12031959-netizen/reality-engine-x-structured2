@@ -86,8 +86,11 @@ export default function Users({ setActiveRoute }) {
   const handleNotify = async (e) => {
     e.preventDefault();
     setIsSendingNotify(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
     try {
-      const result = await apiClient.post(`/accounts/${selectedUser.id}/notifications`, notifyForm);
+      const result = await apiClient.post(`/accounts/${selectedUser.id}/notifications`, notifyForm, { signal: controller.signal });
       if (result.email?.requested && result.email.failed) {
         alert(`Notification saved, but the email could not be sent.${result.email.error ? `\n\nEmail error: ${result.email.error}` : "\n\nCheck the backend email settings."}`);
       } else if (result.email?.requested && result.email.withoutEmail) {
@@ -100,8 +103,9 @@ export default function Users({ setActiveRoute }) {
       setIsNotifying(false);
       setNotifyForm({ title: "", message: "", type: "alert", emailNotify: true });
     } catch (error) {
-      alert(error.message || "Failed to send notification");
+      alert(error.name === "AbortError" ? "Notification request timed out. Check Railway email settings and try again." : (error.message || "Failed to send notification"));
     } finally {
+      clearTimeout(timeoutId);
       setIsSendingNotify(false);
     }
   };

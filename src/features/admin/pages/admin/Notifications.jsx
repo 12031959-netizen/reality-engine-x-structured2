@@ -44,17 +44,21 @@ export default function Notifications({ setActiveRoute }) {
   const handleSend = async (e) => {
     e.preventDefault();
     setIsSending(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
     try {
       let result;
       if (broadcastForm.recipientType === "all") {
-        result = await apiClient.post("/admin/notifications/broadcast", broadcastForm);
+        result = await apiClient.post("/admin/notifications/broadcast", broadcastForm, { signal: controller.signal });
       } else {
         if (!broadcastForm.selectedUserId) {
           alert("Please select a user");
           setIsSending(false);
+          clearTimeout(timeoutId);
           return;
         }
-        result = await apiClient.post(`/accounts/${broadcastForm.selectedUserId}/notifications`, broadcastForm);
+        result = await apiClient.post(`/accounts/${broadcastForm.selectedUserId}/notifications`, broadcastForm, { signal: controller.signal });
       }
 
       const email = result.email;
@@ -76,8 +80,9 @@ export default function Notifications({ setActiveRoute }) {
       });
       fetchNotifications();
     } catch (error) {
-      alert(error.message || "Failed to send notification");
+      alert(error.name === "AbortError" ? "Notification request timed out. Check Railway email settings and try again." : (error.message || "Failed to send notification"));
     } finally {
+      clearTimeout(timeoutId);
       setIsSending(false);
     }
   };
