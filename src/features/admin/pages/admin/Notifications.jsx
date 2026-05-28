@@ -11,7 +11,7 @@ export default function Notifications({ setActiveRoute }) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [broadcastForm, setBroadcastForm] = useState({ title: "", message: "", type: "system", emailNotify: true, recipientType: "all", selectedUserId: "" });
+  const [broadcastForm, setBroadcastForm] = useState({ title: "", message: "", type: "system", emailNotify: false, recipientType: "all", selectedUserId: "" });
   const [users, setUsers] = useState([]);
   const [isSending, setIsSending] = useState(false);
 
@@ -50,7 +50,7 @@ export default function Notifications({ setActiveRoute }) {
     try {
       let result;
       if (broadcastForm.recipientType === "all") {
-        result = await apiClient.post("/admin/notifications/broadcast", broadcastForm, { signal: controller.signal });
+        result = await apiClient.post("/admin/notifications/broadcast", { ...broadcastForm, emailNotify: false }, { signal: controller.signal });
       } else {
         if (!broadcastForm.selectedUserId) {
           alert("Please select a user");
@@ -58,7 +58,7 @@ export default function Notifications({ setActiveRoute }) {
           clearTimeout(timeoutId);
           return;
         }
-        result = await apiClient.post(`/accounts/${broadcastForm.selectedUserId}/notifications`, broadcastForm, { signal: controller.signal });
+        result = await apiClient.post(`/accounts/${broadcastForm.selectedUserId}/notifications`, { ...broadcastForm, emailNotify: false }, { signal: controller.signal });
       }
 
       const email = result.email;
@@ -76,7 +76,7 @@ export default function Notifications({ setActiveRoute }) {
         title: "", 
         message: "", 
         type: "system",
-        emailNotify: true 
+        emailNotify: false
       });
       fetchNotifications();
     } catch (error) {
@@ -192,16 +192,6 @@ export default function Notifications({ setActiveRoute }) {
                 <option value="critical">Critical (Red)</option>
                 <option value="success">Update (Green)</option>
               </select>
-            </div>
-            <div className="form-group checkbox-group" style={{ display: "flex", alignItems: "center", gap: "10px", margin: "10px 0" }}>
-              <input 
-                type="checkbox" 
-                id="emailNotify"
-                checked={broadcastForm.emailNotify} 
-                onChange={(e) => setBroadcastForm({...broadcastForm, emailNotify: e.target.checked})}
-                style={{ width: "18px", height: "18px", cursor: "pointer" }}
-              />
-              <label htmlFor="emailNotify" style={{ margin: 0, cursor: "pointer", fontWeight: "500", color: "var(--text)" }}>Notify by Email</label>
             </div>
             <div className="form-actions">
               <Button type="submit" disabled={isSending} className="full-width">

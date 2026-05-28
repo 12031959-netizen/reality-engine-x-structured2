@@ -15,7 +15,7 @@ export default function Users({ setActiveRoute }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ name: "", email: "", username: "" });
   const [isNotifying, setIsNotifying] = useState(false);
-  const [notifyForm, setNotifyForm] = useState({ title: "", message: "", type: "alert", emailNotify: true });
+  const [notifyForm, setNotifyForm] = useState({ title: "", message: "", type: "alert", emailNotify: false });
   const [isSendingNotify, setIsSendingNotify] = useState(false);
 
   useEffect(() => {
@@ -90,7 +90,7 @@ export default function Users({ setActiveRoute }) {
     const timeoutId = setTimeout(() => controller.abort(), 20000);
 
     try {
-      const result = await apiClient.post(`/accounts/${selectedUser.id}/notifications`, notifyForm, { signal: controller.signal });
+      const result = await apiClient.post(`/accounts/${selectedUser.id}/notifications`, { ...notifyForm, emailNotify: false }, { signal: controller.signal });
       if (result.email?.requested && result.email.failed) {
         alert(`Notification saved, but the email could not be sent.${result.email.error ? `\n\nEmail error: ${result.email.error}` : "\n\nCheck the backend email settings."}`);
       } else if (result.email?.requested && result.email.withoutEmail) {
@@ -101,7 +101,7 @@ export default function Users({ setActiveRoute }) {
         alert("Notification saved successfully!");
       }
       setIsNotifying(false);
-      setNotifyForm({ title: "", message: "", type: "alert", emailNotify: true });
+      setNotifyForm({ title: "", message: "", type: "alert", emailNotify: false });
     } catch (error) {
       alert(error.name === "AbortError" ? "Notification request timed out. Check Railway email settings and try again." : (error.message || "Failed to send notification"));
     } finally {
@@ -269,16 +269,6 @@ export default function Users({ setActiveRoute }) {
                     required
                     style={{ width: "100%", minHeight: "100px", borderRadius: "8px", border: "1px solid var(--border)", background: "var(--background)", color: "var(--text)", padding: "12px" }}
                   ></textarea>
-                </div>
-                <div className="form-group checkbox-group" style={{ display: "flex", alignItems: "center", gap: "10px", margin: "10px 0" }}>
-                  <input 
-                    type="checkbox" 
-                    id="emailNotifySingle"
-                    checked={notifyForm.emailNotify} 
-                    onChange={(e) => setNotifyForm({...notifyForm, emailNotify: e.target.checked})}
-                    style={{ width: "18px", height: "18px", cursor: "pointer" }}
-                  />
-                  <label htmlFor="emailNotifySingle" style={{ margin: 0, cursor: "pointer", fontWeight: "500", color: "var(--text)" }}>Notify by Email</label>
                 </div>
                 <div className="form-actions">
                   <Button type="button" variant="ghost" onClick={() => setIsNotifying(false)}>Back</Button>
