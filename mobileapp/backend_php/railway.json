@@ -4,7 +4,7 @@
     "builder": "DOCKERFILE"
   },
   "deploy": {
-    "startCommand": "apache2-foreground",
+    "startCommand": "/var/www/html/start.sh",
     "healthcheckPath": "/health.php",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
