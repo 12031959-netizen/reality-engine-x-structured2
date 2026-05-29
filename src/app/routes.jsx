@@ -19,6 +19,7 @@ import CheckinsAdmin from "../features/admin/pages/admin/Checkins";
 import WearablesAdmin from "../features/admin/pages/admin/Wearables";
 import FeedbackAdmin from "../features/admin/pages/admin/Feedback";
 import NotificationsAdmin from "../features/admin/pages/admin/Notifications";
+import UserDataAdmin from "../features/admin/pages/admin/UserData";
 import DietAssistant from "../features/assistant/pages/DietAssistant";
 import DietPlans from "../features/plans/pages/DietPlans";
 import Progress from "../features/progress/pages/Progress";
@@ -30,6 +31,7 @@ import {
   Brain,
   CalendarDays,
   ClipboardCheck,
+  Database,
   Gauge,
   Home,
   Info,
@@ -71,6 +73,13 @@ const routes = [
     label: "Check-in Manager",
     icon: Activity,
     component: CheckinsAdmin,
+    roles: ["admin"]
+  },
+  {
+    key: "admin-user-data",
+    label: "User Data",
+    icon: Database,
+    component: UserDataAdmin,
     roles: ["admin"]
   },
   {

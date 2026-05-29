@@ -49,6 +49,9 @@ export default function Login({ setAuthRoute }) {
         <Button type="submit">Login</Button>
 
         <div className="auth-links">
+          <button type="button" onClick={() => setAuthRoute("forgot")}>
+            Forgot password?
+          </button>
           <button type="button" onClick={() => setAuthRoute("signup")}>
             Create account
           </button>

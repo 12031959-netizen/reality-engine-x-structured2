@@ -1606,6 +1606,13 @@ app.post("/accounts/:id/failure-risk", async (req, res) => {
       );
     }
 
+    await saveFailureRecommendation(userId, targetDate, {
+      riskScore: Number(riskScore) || 0,
+      riskLevel: riskLevel || "No Risk Data",
+      reasons,
+      metrics
+    });
+
     const account = await getFullUser(userId);
     res.status(201).json({ ok: true, account });
   } catch (error) {
@@ -1656,6 +1663,164 @@ app.get("/admin/diet-profiles", async (req, res) => {
     const [rows] = await pool.execute("SELECT * FROM diet_profiles ORDER BY updated_at DESC");
     res.json({ dietProfiles: rows });
   } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get saved user data across user-facing features (Admin)
+app.get("/admin/user-data", async (req, res) => {
+  try {
+    const [failureRisks] = await pool.execute(`
+      SELECT
+        f.id,
+        f.user_id AS userId,
+        COALESCE(u.fullName, u.name, u.username) AS userName,
+        u.email,
+        DATE_FORMAT(f.check_in_date, '%Y-%m-%d') AS date,
+        f.risk_score AS riskScore,
+        f.risk_level AS riskLevel,
+        f.risk_message AS riskMessage,
+        f.reasons,
+        f.insights,
+        f.metrics,
+        DATE_FORMAT(f.created_at, '%Y-%m-%d %H:%i:%s') AS createdAt
+      FROM failure_risk_results f
+      LEFT JOIN users u ON u.userID = f.user_id
+      ORDER BY f.check_in_date DESC, f.created_at DESC
+    `);
+
+    const [dietPlans] = await pool.execute(`
+      SELECT
+        d.planID AS id,
+        d.userID AS userId,
+        COALESCE(u.fullName, u.name, u.username) AS userName,
+        u.email,
+        d.planName,
+        d.dailyCalories,
+        d.proteinGoal,
+        d.carbGoal,
+        d.fatGoal,
+        DATE_FORMAT(d.startDate, '%Y-%m-%d') AS startDate,
+        DATE_FORMAT(d.endDate, '%Y-%m-%d') AS endDate,
+        d.planStatus
+      FROM dietplan d
+      LEFT JOIN users u ON u.userID = d.userID
+      ORDER BY d.startDate DESC, d.planID DESC
+    `);
+
+    const [mealLogs] = await pool.execute(`
+      SELECT
+        f.foodLogiD AS id,
+        f.userID AS userId,
+        COALESCE(u.fullName, u.name, u.username) AS userName,
+        u.email,
+        DATE_FORMAT(f.date, '%Y-%m-%d') AS date,
+        f.mealName,
+        f.calories,
+        f.protein,
+        f.carbs,
+        f.fats,
+        f.waterintake
+      FROM foodlog f
+      LEFT JOIN users u ON u.userID = f.userID
+      ORDER BY f.date DESC, f.foodLogiD DESC
+    `);
+
+    const [moodLogs] = await pool.execute(`
+      SELECT
+        m.moodLogiD AS id,
+        m.userID AS userId,
+        COALESCE(u.fullName, u.name, u.username) AS userName,
+        u.email,
+        DATE_FORMAT(m.date, '%Y-%m-%d') AS date,
+        m.moodLevel,
+        m.stressLevel,
+        m.cravingLevel,
+        m.sleepHours,
+        m.motivationLevel,
+        m.consistencyStatus
+      FROM moodlog m
+      LEFT JOIN users u ON u.userID = m.userID
+      ORDER BY m.date DESC, m.moodLogiD DESC
+    `);
+
+    const [progress] = await pool.execute(`
+      SELECT
+        p.progressID AS id,
+        p.userID AS userId,
+        COALESCE(u.fullName, u.name, u.username) AS userName,
+        u.email,
+        DATE_FORMAT(p.date, '%Y-%m-%d') AS date,
+        p.weight,
+        p.bodyMeasurement,
+        p.progressNote,
+        p.consistencyScore
+      FROM progresstracking p
+      LEFT JOIN users u ON u.userID = p.userID
+      ORDER BY p.date DESC, p.progressID DESC
+    `);
+
+    const [recommendations] = await pool.execute(`
+      SELECT
+        r.recommendationID AS id,
+        r.userID AS userId,
+        COALESCE(u.fullName, u.name, u.username) AS userName,
+        u.email,
+        DATE_FORMAT(r.date, '%Y-%m-%d') AS date,
+        r.predictionID,
+        r.recommendationType,
+        r.recommendationText
+      FROM recommendations r
+      LEFT JOIN users u ON u.userID = r.userID
+      ORDER BY r.date DESC, r.recommendationID DESC
+    `);
+    const mergedRecommendations = [...recommendations];
+    const recommendationKeys = new Set(
+      recommendations.map((recommendation) =>
+        `${recommendation.userId}|${recommendation.date}|${recommendation.recommendationType}`
+      )
+    );
+
+    failureRisks.forEach((risk) => {
+      const key = `${risk.userId}|${risk.date}|Failure Risk Recommendation`;
+      if (recommendationKeys.has(key)) return;
+
+      mergedRecommendations.push({
+        id: `failure-risk-${risk.id}`,
+        userId: risk.userId,
+        userName: risk.userName,
+        email: risk.email,
+        date: risk.date,
+        predictionID: null,
+        recommendationType: "Failure Risk Recommendation",
+        recommendationText: buildFailureRecommendationText({
+          riskScore: risk.riskScore,
+          riskLevel: risk.riskLevel,
+          reasons: parseJsonField(risk.reasons, []),
+          metrics: parseJsonField(risk.metrics, {})
+        })
+      });
+      recommendationKeys.add(key);
+    });
+
+    res.json({
+      ok: true,
+      failureRisks: failureRisks.map((risk) => ({
+        ...risk,
+        reasons: parseJsonField(risk.reasons, []),
+        insights: parseJsonField(risk.insights, []),
+        metrics: parseJsonField(risk.metrics, {})
+      })),
+      dietPlans,
+      mealLogs,
+      moodLogs,
+      progress,
+      recommendations: mergedRecommendations.sort((a, b) =>
+        String(b.date || "").localeCompare(String(a.date || ""))
+      )
+    });
+  } catch (error) {
+    console.error("GET /admin/user-data error:", error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -2349,6 +2514,13 @@ async function saveFailureRiskResult(userId, targetDate, checkInValues) {
     );
   }
 
+  await saveFailureRecommendation(userId, targetDate, {
+    riskScore,
+    riskLevel: level.label,
+    reasons,
+    metrics
+  });
+
   return {
     riskScore,
     riskLevel: level.label,
@@ -2357,6 +2529,55 @@ async function saveFailureRiskResult(userId, targetDate, checkInValues) {
     insights,
     metrics
   };
+}
+
+function buildFailureRecommendationText({ riskScore, riskLevel, reasons = [], metrics = {} }) {
+  const actions = [];
+
+  if (metrics.proteinTarget && metrics.protein < metrics.proteinTarget * 0.75) {
+    actions.push("Add a lean protein serving to the next meal.");
+  }
+
+  if (metrics.waterTarget && metrics.water < metrics.waterTarget * 0.75) {
+    actions.push("Bring water intake closer to the hydration target.");
+  }
+
+  if (Number(metrics.sleep) < 6) {
+    actions.push("Protect tonight's sleep window before adding more diet pressure.");
+  }
+
+  if (Number(metrics.stress) >= 7) {
+    actions.push("Use a lower-stress meal plan and reduce decision fatigue today.");
+  }
+
+  if (Number(metrics.cravings) >= 7) {
+    actions.push("Plan one controlled snack before cravings turn into overeating.");
+  }
+
+  if (!actions.length && reasons.length) {
+    actions.push(reasons[0]);
+  }
+
+  if (!actions.length) {
+    actions.push("Keep logging meals, mood, water, and sleep so the plan stays measurable.");
+  }
+
+  return `${riskLevel || "Failure Risk"} (${Number(riskScore) || 0}%): ${actions.slice(0, 3).join(" ")}`;
+}
+
+async function saveFailureRecommendation(userId, targetDate, riskResult) {
+  const recommendationType = "Failure Risk Recommendation";
+  const recommendationText = buildFailureRecommendationText(riskResult);
+
+  await pool.execute(
+    "DELETE FROM recommendations WHERE userID = ? AND date = ? AND recommendationType = ?",
+    [userId, targetDate, recommendationType]
+  );
+
+  await pool.execute(
+    "INSERT INTO recommendations (userID, predictionID, recommendationText, recommendationType, date) VALUES (?, ?, ?, ?, ?)",
+    [userId, null, recommendationText, recommendationType, targetDate]
+  );
 }
 
 function buildFailureReasons(metrics) {

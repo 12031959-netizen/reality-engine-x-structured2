@@ -4,6 +4,7 @@ import {
   BarChart3,
   BellRing,
   ClipboardCheck,
+  Database,
   HeartPulse,
   MessageSquare,
   UserRound,
@@ -145,6 +146,12 @@ export default function AdminDashboard({ setActiveRoute }) {
           title="Check-in Manager" 
           description="Audit daily food & mood logs"
           onClick={() => setActiveRoute("admin-checkins")}
+        />
+        <ManagementCard
+          icon={Database}
+          title="User Data"
+          description="Read saved failure risk, diet plans, meals, mood, progress, and recommendations"
+          onClick={() => setActiveRoute("admin-user-data")}
         />
         <ManagementCard 
           icon={Watch} 
